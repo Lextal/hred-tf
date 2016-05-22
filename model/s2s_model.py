@@ -1,11 +1,12 @@
 import tensorflow as tf
 from tensorflow.python.ops.rnn import *
 from tensorflow.python.ops.rnn_cell import *
-from tensorflow.python.ops import variable_scope, seq2seq, math_ops
+from tensorflow.python.ops import variable_scope, seq2seq
 import numpy as np
 import numpy.random as rnd
 
 from itertools import izip
+
 
 class HierarchicalSeq2SeqModel:
     def __init__(self, vocab_size, batch_size, topology, cells_size,
@@ -166,7 +167,7 @@ class HierarchicalSeq2SeqModel:
             output_feed = [self.updates,  # Update Op that does SGD.
                            self.losses]  # Loss for this batch.
         else:
-            output_feed.append(self.losses) # only loss
+            output_feed.append(self.losses)  # only loss
         output_feed.extend(self.seq2seq)
 
         results = session.run(output_feed, feed)
