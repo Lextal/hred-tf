@@ -104,8 +104,8 @@ def train(source_path, target_path):
                 model.saver.save(sess, checkpoint_path, global_step=model.global_step)
                 step_time, loss = 0.0, 0.0
                 for q in decode(logits)[:5]:
-                    print q
-                print '=' * 100
+                    print(q)
+                print('=' * 100)
 
 
 def decode(logits, vocab):
