@@ -4,8 +4,10 @@ from time import time
 from s2s_model import HierarchicalSeq2SeqModel
 import tensorflow as tf
 
-data_dir = '../../train/'
-train_dir = data_dir + 'model/'
+data_dir = '../../../data/'
+train_dir = data_dir
+
+DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)]
 
 """
     Topology describes the length of a sequence on a certain level of hierarchy.
@@ -15,7 +17,7 @@ train_dir = data_dir + 'model/'
     Amount of symbols on every data point must be equal to the product of topology layers' sizes.
 """
 
-topology = [10, 5]
+topology = [16, 11]
 seq_len = 1  # computing fixed length of a sequence
 for q in topology:
     seq_len *= q
@@ -23,8 +25,8 @@ for q in topology:
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
 tf.app.flags.DEFINE_integer('vocab_size', 50, "The size of vocabulary")
 tf.app.flags.DEFINE_integer('batch_size', 40, "The size of batch for every step")
-tf.app.flags.DEFINE_integer("num_layers", 5, "Number of LSTM cells in earch layer")
-tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
+tf.app.flags.DEFINE_integer("num_layers", 3, "Number of LSTM cells in earch layer")
+tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 tf.app.flags.DEFINE_integer("steps_per_checkpoint", 100,
@@ -32,8 +34,6 @@ tf.app.flags.DEFINE_integer("steps_per_checkpoint", 100,
 tf.app.flags.DEFINE_integer("seq_len", seq_len, "Fixed length of input and output sequence")
 
 FLAGS = tf.app.flags.FLAGS
-
-PAD_ID = 0
 
 
 def read_data(source_path, target_path):
@@ -88,7 +88,6 @@ def train(source_path, target_path):
             step_time += (time() - start_time) / FLAGS.steps_per_checkpoint
             loss += step_loss / FLAGS.steps_per_checkpoint
             current_step += 1
-
             if current_step % FLAGS.steps_per_checkpoint == 0:
                 # Print statistics for the previous epoch.
                 perplexity = math.exp(loss) if loss < 300 else float('inf')
@@ -108,7 +107,7 @@ def train(source_path, target_path):
                 print('=' * 100)
 
 
-def decode(logits, vocab):
+def decode(logits, vocab=DEFAULT_VOCAB):
     """
     Returns a list of length batch_size containing decoded strings
     :param logits: list of batches from a model
@@ -119,12 +118,14 @@ def decode(logits, vocab):
     for i in range(FLAGS.batch_size):
         for j in range(FLAGS.seq_len):
             c = vocab[np.argmax(logits[j][i])]
-            if c != PAD_ID:
-                result[i] += c
+            result[i] += c
+            if j % topology[0] == 0 and j > 0:
+                result[i] += ' '
     return result
 
 
 if __name__ == '__main__':
-    source_path = 'source.txt'
-    target_path = 'target.txt'
+    source_path = FLAGS.train_dir + 'source.txt'
+    target_path = FLAGS.train_dir + 'target.txt'
+    #dataset = read_data(source_path, target_path)
     train(source_path, target_path)
