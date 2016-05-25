@@ -112,10 +112,7 @@ def train(source_path, target_path):
 
 def decode(logits, vocab=DEFAULT_VOCAB):
     """
-    Returns a list of length batch_size containing decoded strings
-    :param logits: list of batches from a model
-    :param vocab: Vocabulary, a list of strings
-    :return:
+    Super simple decoder for two-level hierarchy (chars -> words)
     """
     result = ['' for _ in range(FLAGS.batch_size)]
     for i in range(FLAGS.batch_size):
@@ -127,6 +124,11 @@ def decode(logits, vocab=DEFAULT_VOCAB):
     return result
 
 
+'''
+    Both source.txt and target.txt are files of equal length with sequences of integers
+    One sequence - one line
+    It's assumed that all sequences conform to topology
+'''
 if __name__ == '__main__':
     source_path = FLAGS.train_dir + 'source.txt'
     target_path = FLAGS.train_dir + 'target.txt'
