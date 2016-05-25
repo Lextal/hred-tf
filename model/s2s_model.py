@@ -5,7 +5,7 @@ from tensorflow.python.ops import variable_scope, seq2seq
 import numpy as np
 import numpy.random as rnd
 
-from itertools import izip
+from functools import reduce
 
 
 class HierarchicalSeq2SeqModel:
@@ -149,17 +149,17 @@ class HierarchicalSeq2SeqModel:
 
         feed = {}
         # adding input sequence for encoder
-        for ph, tensor in izip(self.enc_inputs, inputs):
+        for ph, tensor in zip(self.enc_inputs, inputs):
             feed[ph] = tensor
         # output sequences for every decoder (filled with zeros)
         for i in range(self.n_layers):
             for j, tensor in enumerate(self.dec_inputs[i]):
                 feed[tensor] = self.dec_data[i][j]
             # target sequence
-            for ph, tensor in izip(self.targets, outputs):
+            for ph, tensor in zip(self.targets, outputs):
                 feed[ph] = tensor
             # weights
-            for ph, tensor in izip(self.weights, self.default_weights):
+            for ph, tensor in zip(self.weights, self.default_weights):
                 feed[ph] = tensor
 
         output_feed = []
@@ -191,4 +191,4 @@ class HierarchicalSeq2SeqModel:
 
         inputs = map(lambda x: np.asarray(x, dtype='int32'), inputs)
         targets = map(lambda x: np.asarray(x, dtype='int32'), targets)
-        return inputs, targets
+        return list(inputs), list(targets)
