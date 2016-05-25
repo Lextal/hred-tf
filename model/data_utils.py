@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from functools import reduce
 
+
 def prepare_splitters(tokens):
     return [re.compile(t) for t in tokens]
 

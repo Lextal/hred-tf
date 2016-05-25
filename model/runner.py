@@ -27,9 +27,9 @@ for q in topology:
 
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
 tf.app.flags.DEFINE_integer('vocab_size', 27, "The size of vocabulary")
-tf.app.flags.DEFINE_integer('batch_size', 10, "The size of batch for every step")
+tf.app.flags.DEFINE_integer('batch_size', 20, "The size of batch for every step")
 tf.app.flags.DEFINE_integer("num_layers", 5, "Number of LSTM cells in each layer")
-tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
+tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
 tf.app.flags.DEFINE_integer("steps_per_checkpoint", 100,
@@ -85,9 +85,9 @@ def train(source_path, target_path):
         while True:
             start_time = time()
 
-            data, targets = model.get_batch(dataset)
+            data, targets, weights = model.get_batch(dataset)
 
-            step_loss, logits = model.step(sess, data, targets)
+            step_loss, logits = model.step(sess, data, targets, weights)
             step_time += (time() - start_time) / FLAGS.steps_per_checkpoint
             loss += step_loss / FLAGS.steps_per_checkpoint
             current_step += 1

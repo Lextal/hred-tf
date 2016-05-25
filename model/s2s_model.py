@@ -71,9 +71,9 @@ class HierarchicalSeq2SeqModel:
                                               name='Encoder_Input_{}'.format(q)) for q in range(seq_len)]
             self.targets = [tf.placeholder(tf.int32, [None],
                                            name='Target_{}'.format(q)) for q in range(seq_len)]
-            self.weights = [tf.placeholder(tf.float32, 1, name='Weights_{}'.format(q)) for q in range(seq_len)]
+            self.weights = [tf.placeholder(tf.float32, [None], name='Weights_{}'.format(q)) for q in range(seq_len)]
 
-        self.default_weights = [np.asarray([1.]) for _ in range(seq_len)]
+        #self.default_weights = [np.asarray([1.]) for _ in range(seq_len)]
         self.encoder = self.hierarchical_encoder()
         self.seq2seq = self.hierarchical_decoder(self.encoder)
         self.losses = seq2seq.sequence_loss(self.seq2seq, self.targets, self.weights)
@@ -132,21 +132,21 @@ class HierarchicalSeq2SeqModel:
                 dec = self.decoder(self.dec_cells[i], self.dec_inputs[i], dec, self.dec_scopes[i])
         return dec
 
-    def step(self, session, inputs, outputs, forward_only=False):
+    def step(self, session, inputs, outputs, weights, forward_only=False):
         """
-
         :param session: Current session to run a step in
         :param inputs: List of buckets, each element within is int32, structure conforming to enc_inputs
         :param outputs: List of target outputs, structure is the same as inputs
+        :param weights:
         :param forward_only: Boolean, indicating whether to perform backward pass
         :return:
         """
         if len(inputs) != len(self.enc_inputs):
             raise ValueError("Encoder length must be equal to the one in bucket,"
-                             " %d != %d.".format(len(self.enc_inputs), len(inputs)))
+                             " {} != {}.".format(len(self.enc_inputs), len(inputs)))
         if len(outputs) != len(self.targets):
             raise ValueError("Decoder length must be equal to the one in bucket,"
-                             " %d != %d.".format(len(self.targets), len(outputs)))
+                             " {} != {}.".format(len(self.targets), len(outputs)))
 
         feed = {}
         # adding input sequence for encoder
@@ -160,7 +160,9 @@ class HierarchicalSeq2SeqModel:
             for ph, tensor in zip(self.targets, outputs):
                 feed[ph] = tensor
             # weights
-            for ph, tensor in zip(self.weights, self.default_weights):
+            # for ph, tensor in zip(self.weights, self.default_weights):
+            #     feed[ph] = tensor
+            for ph, tensor in zip(self.weights, weights):
                 feed[ph] = tensor
 
         output_feed = []
@@ -190,6 +192,7 @@ class HierarchicalSeq2SeqModel:
                 inputs[i].append(input_sample[j][i])
                 targets[i].append(output_sample[j][i])
 
-        inputs = map(lambda x: np.asarray(x, dtype='int32'), inputs)
-        targets = map(lambda x: np.asarray(x, dtype='int32'), targets)
-        return list(inputs), list(targets)
+        inputs = list(map(lambda x: np.asarray(x, dtype='int32'), inputs))
+        targets = list(map(lambda x: np.asarray(x, dtype='int32'), targets))
+        weights = [np.sign(x).astype(float) for x in targets]
+        return list(inputs), list(targets), weights
