@@ -80,7 +80,8 @@ class HierarchicalSeq2SeqModel:
 
         params = tf.trainable_variables()
         if not forward_only:
-            opt = tf.train.AdagradOptimizer(self.learning_rate)
+            #opt = tf.train.AdagradOptimizer(self.learning_rate)
+            opt = tf.train.AdadeltaOptimizer(self.learning_rate)
             gradients = tf.gradients(self.losses, params)
             clipped_gradients, norm = tf.clip_by_global_norm(gradients, max_gradient_norm)
             self.gradient_norm = norm
