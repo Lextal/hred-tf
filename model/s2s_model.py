@@ -73,14 +73,13 @@ class HierarchicalSeq2SeqModel:
                                            name='Target_{}'.format(q)) for q in range(seq_len)]
             self.weights = [tf.placeholder(tf.float32, [None], name='Weights_{}'.format(q)) for q in range(seq_len)]
 
-        #self.default_weights = [np.asarray([1.]) for _ in range(seq_len)]
         self.encoder = self.hierarchical_encoder()
-        self.seq2seq = self.hierarchical_decoder(self.encoder)
-        self.losses = seq2seq.sequence_loss(self.seq2seq, self.targets, self.weights)
+        self.logits = self.hierarchical_decoder(self.encoder)
+        self.seq2seq = [tf.arg_max(x, 1) for x in self.logits]
+        self.losses = seq2seq.sequence_loss(self.logits, self.targets, self.weights)
 
         params = tf.trainable_variables()
         if not forward_only:
-            #opt = tf.train.AdagradOptimizer(self.learning_rate)
             opt = tf.train.AdadeltaOptimizer(self.learning_rate)
             gradients = tf.gradients(self.losses, params)
             clipped_gradients, norm = tf.clip_by_global_norm(gradients, max_gradient_norm)
@@ -160,8 +159,6 @@ class HierarchicalSeq2SeqModel:
             for ph, tensor in zip(self.targets, outputs):
                 feed[ph] = tensor
             # weights
-            # for ph, tensor in zip(self.weights, self.default_weights):
-            #     feed[ph] = tensor
             for ph, tensor in zip(self.weights, weights):
                 feed[ph] = tensor
 
@@ -169,12 +166,13 @@ class HierarchicalSeq2SeqModel:
         if not forward_only:
             output_feed = [self.updates,  # Update Op that does SGD.
                            self.losses]  # Loss for this batch.
-        else:
-            output_feed.append(self.losses)  # only loss
         output_feed.extend(self.seq2seq)
 
         results = session.run(output_feed, feed)
-        return results[1], results[2:]
+        if not forward_only:
+            return results[1], results[2:]
+        else:
+            return results
 
     def get_batch(self, data, size=None):
         if not size:
@@ -195,4 +193,4 @@ class HierarchicalSeq2SeqModel:
         inputs = list(map(lambda x: np.asarray(x, dtype='int32'), inputs))
         targets = list(map(lambda x: np.asarray(x, dtype='int32'), targets))
         weights = [np.sign(x).astype(float) for x in targets]
-        return list(inputs), list(targets), weights
+        return inputs, targets, weights, ind

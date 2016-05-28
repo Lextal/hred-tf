@@ -7,10 +7,10 @@ import tensorflow as tf
 
 from s2s_model import HierarchicalSeq2SeqModel
 
-data_dir = '../../../data/'
+data_dir = '../../../data/test/'
 train_dir = data_dir
 
-DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)]
+DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [' ']
 
 """
     Topology describes the length of a sequence on a certain level of hierarchy.
@@ -20,14 +20,14 @@ DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)]
     Amount of symbols on every data point must be equal to the product of topology layers' sizes.
 """
 
-topology = [16, 11]
+topology = [8, 10]
 seq_len = 1  # computing fixed length of a sequence
 for q in topology:
     seq_len *= q
 
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
-tf.app.flags.DEFINE_integer('vocab_size', 27, "The size of vocabulary")
-tf.app.flags.DEFINE_integer('batch_size', 20, "The size of batch for every step")
+tf.app.flags.DEFINE_integer('vocab_size', len(DEFAULT_VOCAB), "The size of vocabulary")
+tf.app.flags.DEFINE_integer('batch_size', 50, "The size of batch for every step")
 tf.app.flags.DEFINE_integer("num_layers", 5, "Number of LSTM cells in each layer")
 tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
@@ -84,10 +84,8 @@ def train(source_path, target_path):
 
         while True:
             start_time = time()
-
-            data, targets, weights = model.get_batch(dataset)
-
-            step_loss, logits = model.step(sess, data, targets, weights)
+            data, targets, weights, ind = model.get_batch(dataset)
+            step_loss, outputs = model.step(sess, data, targets, weights)
             step_time += (time() - start_time) / FLAGS.steps_per_checkpoint
             loss += step_loss / FLAGS.steps_per_checkpoint
             current_step += 1
@@ -105,23 +103,17 @@ def train(source_path, target_path):
                 checkpoint_path = os.path.join(FLAGS.train_dir, "hred.ckpt")
                 model.saver.save(sess, checkpoint_path, global_step=model.global_step)
                 step_time, loss = 0.0, 0.0
-                for q in decode(logits)[:5]:
-                    print(q)
-                print('=' * 100)
 
 
-def decode(logits, vocab=DEFAULT_VOCAB):
+def decode(outputs, vocab=DEFAULT_VOCAB):
     """
     Super simple decoder for two-level hierarchy (chars -> words)
     """
-    result = ['' for _ in range(FLAGS.batch_size)]
-    for i in range(FLAGS.batch_size):
-        for j in range(FLAGS.seq_len):
-            c = vocab[np.argmax(logits[j][i])]
-            result[i] += c
-            if j % topology[0] == 0 and j > 0:
-                result[i] += ' '
-    return result
+    seqs = np.asarray(outputs).T
+    results = []
+    for seq in seqs:
+        results.append(''.join([vocab[x] for x in seq]))
+    return results
 
 
 '''
@@ -133,3 +125,4 @@ if __name__ == '__main__':
     source_path = FLAGS.train_dir + 'source.txt'
     target_path = FLAGS.train_dir + 'target.txt'
     train(source_path, target_path)
+    # sample_decoding(source_path, target_path)
