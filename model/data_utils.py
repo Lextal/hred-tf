@@ -2,13 +2,12 @@ import re
 import numpy as np
 import tensorflow as tf
 
-from functools import reduce
-
 
 def prepare_splitters(tokens):
     return [re.compile(t) for t in tokens]
 
-
+DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [' ']
+DEFAULT_VOCAB = dict(zip(DEFAULT_VOCAB, range(len(DEFAULT_VOCAB))))
 DEFAULT_TOKENS = prepare_splitters([' ', '\. '])
 FILTER_NON_ENG = re.compile('[^a-z ]+')
 
@@ -48,51 +47,39 @@ def analyze_file(path, tokens):
         return result
 
 
-def process_line(line):
-    return re.sub(FILTER_NON_ENG, '', line.lower())
-
-
-def clean_text(source_path, target_path):
-    count = 0
-    with tf.gfile.GFile(source_path) as source:
-        with tf.gfile.GFile(target_path, mode='w') as target:
-            s = source.readline()
-            while s:
-                count += 1
-                if count % 100000 == 0:
-                    print('{} lines processed'.format(count))
-                target.write(process_line(s) + '\n')
-                s = source.readline()
-
-
-def build_hierarchy(tokens, acc):
-    if len(tokens) == 0:
-        return acc
-    else:
-        return [build_hierarchy(tokens[1:], re.split(tokens[0], x)) for x in acc]
+def encode_sent(sent, levels, vocab=DEFAULT_VOCAB):
+    word_size, n_words = levels[0] + 1, levels[1]
+    result = []
+    words = sent.split()
+    for _ in range(len(words), n_words):
+        words.append('')
+    for w in words:
+        for c in range(word_size):
+            if c == len(w):
+                result.append(' ')
+            else:
+                if c > len(w):
+                    result.append('')
+                else:
+                    result.append(w[c])
+    return [vocab[c] for c in result]
 
 
 def encode_file(source_path, output_path, levels):
-    word_size, n_words = levels[0], levels[1]
     with tf.gfile.GFile(source_path) as source:
         with tf.gfile.GFile(output_path, mode='w') as target:
             s = source.readline()
             while s:
-                h = []
-                words = re.split(' ', s.strip())
-                for _ in range(len(words), n_words):
-                    words.append('')
-                for w in range(n_words):
-                    for c in words[w]:
-                        h.append(ord(c) - ord('a') + 1)
-                    for c in range(len(words[w]), word_size):
-                        h.append(0)
+                h = encode_sent(s, levels)
                 target.write(' '.join(map(str, h)) + '\n')
                 s = source.readline()
 
 
 def validate(path, levels):
-    checksum = reduce(lambda x, y: x * y, levels)
+    """
+    Validation for two-level hierarchy only
+    """
+    checksum = (levels[0] + 1) * levels[1]
     with tf.gfile.GFile(path) as f:
         s = f.readline()
         while s:
@@ -101,6 +88,7 @@ def validate(path, levels):
                 print(s.split())
                 return False
             s = f.readline()
+    print('File {} is valid'.format(path))
     return True
 
 

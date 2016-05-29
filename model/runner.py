@@ -26,6 +26,7 @@ for q in topology:
     seq_len *= q
 
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
+tf.app.flags.DEFINE_string("log_file", train_dir + 'training.log', "Logging the perplexity")
 tf.app.flags.DEFINE_integer('vocab_size', len(DEFAULT_VOCAB), "The size of vocabulary")
 tf.app.flags.DEFINE_integer('batch_size', 50, "The size of batch for every step")
 tf.app.flags.DEFINE_integer("num_layers", 5, "Number of LSTM cells in each layer")
@@ -72,7 +73,7 @@ def create_model(session, forward_only):
     return model
 
 
-def train(source_path, target_path):
+def train(source_path, target_path, verbose=False):
     with tf.Session() as sess:
         model = create_model(sess, False)
 
@@ -81,6 +82,8 @@ def train(source_path, target_path):
         previous_losses = []
 
         dataset = read_data(source_path, target_path)
+
+        logger = tf.gfile.GFile(FLAGS.log_file, mode='a')
 
         while True:
             start_time = time()
@@ -95,6 +98,10 @@ def train(source_path, target_path):
                 print("global step %d learning rate %.4f step-time %.2f perplexity "
                       "%.2f" % (model.global_step.eval(), model.learning_rate.eval(),
                                 step_time, perplexity))
+                logger.write("global step %d learning rate %.4f step-time %.2f perplexity "
+                      "%.2f" % (model.global_step.eval(), model.learning_rate.eval(),
+                                step_time, perplexity) + '\n')
+                logger.flush()
                 # Decrease learning rate if no improvement was seen over last 3 times.
                 if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
                     sess.run(model.learning_rate_decay_op)
@@ -103,13 +110,18 @@ def train(source_path, target_path):
                 checkpoint_path = os.path.join(FLAGS.train_dir, "hred.ckpt")
                 model.saver.save(sess, checkpoint_path, global_step=model.global_step)
                 step_time, loss = 0.0, 0.0
+                if verbose:
+                    orig = decode(targets)
+                    outs = decode(outputs)
+                    for i in range(5):
+                        print(orig[i], ' || ', outs[i])
 
 
 def decode(outputs, vocab=DEFAULT_VOCAB):
     """
     Super simple decoder for two-level hierarchy (chars -> words)
     """
-    seqs = np.asarray(outputs).T
+    seqs = np.asarray(outputs).T.tolist()
     results = []
     for seq in seqs:
         results.append(''.join([vocab[x] for x in seq]))
