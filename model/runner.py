@@ -2,15 +2,14 @@ import math
 import os
 from time import time
 
+from data_utils import *
 import numpy as np
 import tensorflow as tf
 
 from s2s_model import HierarchicalSeq2SeqModel
 
-data_dir = '../../../data/test/'
+data_dir = '../../../data/wiki/'
 train_dir = data_dir
-
-DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [' ']
 
 """
     Topology describes the length of a sequence on a certain level of hierarchy.
@@ -20,7 +19,7 @@ DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [' ']
     Amount of symbols on every data point must be equal to the product of topology layers' sizes.
 """
 
-topology = [8, 10]
+topology = [14, 10]
 seq_len = 1  # computing fixed length of a sequence
 for q in topology:
     seq_len *= q
@@ -28,12 +27,12 @@ for q in topology:
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
 tf.app.flags.DEFINE_string("log_file", train_dir + 'training.log', "Logging the perplexity")
 tf.app.flags.DEFINE_integer('vocab_size', len(DEFAULT_VOCAB), "The size of vocabulary")
-tf.app.flags.DEFINE_integer('batch_size', 50, "The size of batch for every step")
-tf.app.flags.DEFINE_integer("num_layers", 5, "Number of LSTM cells in each layer")
+tf.app.flags.DEFINE_integer('batch_size', 100, "The size of batch for every step")
+tf.app.flags.DEFINE_integer("num_layers", 10, "Number of LSTM cells in each layer")
 tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
-tf.app.flags.DEFINE_integer("steps_per_checkpoint", 100,
+tf.app.flags.DEFINE_integer("steps_per_checkpoint", 10,
                             "How many training steps to do per checkpoint.")
 tf.app.flags.DEFINE_integer("seq_len", seq_len, "Fixed length of input and output sequence")
 
@@ -137,4 +136,3 @@ if __name__ == '__main__':
     source_path = FLAGS.train_dir + 'source.txt'
     target_path = FLAGS.train_dir + 'target.txt'
     train(source_path, target_path)
-    # sample_decoding(source_path, target_path)
