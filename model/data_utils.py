@@ -6,7 +6,7 @@ import tensorflow as tf
 def prepare_splitters(tokens):
     return [re.compile(t) for t in tokens]
 
-DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [str(i) for i in range(10)] + [' ']-
+DEFAULT_VOCAB = [''] + [chr(ord('a') + i) for i in range(26)] + [str(i) for i in range(10)] + [' ']
 DEFAULT_VOCAB = dict(zip(DEFAULT_VOCAB, range(len(DEFAULT_VOCAB))))
 DEFAULT_TOKENS = prepare_splitters([' ', '\. '])
 FILTER_NON_ENG = re.compile('[^a-z ]+')
