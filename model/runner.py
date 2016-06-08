@@ -20,6 +20,7 @@ train_dir = data_dir
 """
 
 topology = [14, 10]
+cell_sizes = [8, 2]
 seq_len = 1  # computing fixed length of a sequence
 for q in topology:
     seq_len *= q
@@ -27,8 +28,8 @@ for q in topology:
 tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
 tf.app.flags.DEFINE_string("log_file", train_dir + 'training.log', "Logging the perplexity")
 tf.app.flags.DEFINE_integer('vocab_size', len(DEFAULT_VOCAB), "The size of vocabulary")
-tf.app.flags.DEFINE_integer('batch_size', 100, "The size of batch for every step")
-tf.app.flags.DEFINE_integer("num_layers", 10, "Number of LSTM cells in each layer")
+tf.app.flags.DEFINE_integer('batch_size', 50, "The size of batch for every step")
+tf.app.flags.DEFINE_integer("num_layers", 4, "Number of LSTM cells in each layer")
 tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
@@ -50,8 +51,8 @@ def read_data(source_path, target_path):
                 counter += 1
                 if counter % 10000 == 0:
                     print('Reading data line {}'.format(counter))
-                source_ids = [int(x) for x in s.split()]
-                target_ids = [int(x) for x in t.split()]
+                source_ids = np.asarray([int(x) for x in s.split()], dtype="int32")
+                target_ids = np.asarray([int(x) for x in t.split()], dtype="int32")
                 inputs.append(source_ids)
                 outputs.append(target_ids)
                 s, t = source.readline(), target.readline()
@@ -59,8 +60,8 @@ def read_data(source_path, target_path):
 
 
 def create_model(session, forward_only):
-    model = HierarchicalSeq2SeqModel(FLAGS.vocab_size, FLAGS.batch_size, topology,
-                                     FLAGS.num_layers, FLAGS.learning_rate, FLAGS.learning_rate_decay_factor,
+    model = HierarchicalSeq2SeqModel(FLAGS.vocab_size, FLAGS.batch_size, topology, cell_sizes,
+                                     FLAGS.learning_rate, FLAGS.learning_rate_decay_factor,
                                      FLAGS.max_gradient_norm, embed=True, forward_only=forward_only)
     ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
     if ckpt and tf.gfile.Exists(ckpt.model_checkpoint_path):
@@ -116,7 +117,7 @@ def train(source_path, target_path, verbose=False):
                         print(orig[i], ' || ', outs[i])
 
 
-def decode(outputs, vocab=DEFAULT_VOCAB):
+def decode(outputs, vocab=DECODE_VOCAB):
     """
     Super simple decoder for two-level hierarchy (chars -> words)
     """

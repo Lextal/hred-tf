@@ -5,60 +5,59 @@ from tensorflow.python.ops import variable_scope, seq2seq
 import numpy as np
 import numpy.random as rnd
 
-from functools import reduce
-
 
 class HierarchicalSeq2SeqModel:
-    def __init__(self, vocab_size, batch_size, topology, cells_size,
+    def __init__(self, vocab_size, batch_size, topology, cell_sizes,
                  learning_rate, lr_decay_rate, max_gradient_norm,
-                 embed=False, forward_only=False):
+                 cell_type=BasicLSTMCell, embed=False, forward_only=False):
         self.emb_size = vocab_size
         self.batch_size = batch_size
-        self.topology = topology
+        self.seq_sizes = topology
         self.n_layers = len(topology)
-        self.cells_size = cells_size
+        self.cell_sizes = cell_sizes
 
         self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
         self.learning_rate_decay_op = self.learning_rate.assign(
             self.learning_rate * lr_decay_rate)
         self.global_step = tf.Variable(0, trainable=False)
-        seq_len = reduce(lambda x, y: x * y, self.topology)
+        self.seq_len = 1
+        for seq_size in self.seq_sizes:
+            self.seq_len *= seq_size
         self.enc_inputs = [tf.placeholder(tf.float32, [batch_size, self.emb_size],
-                                          name='Encoder_Input_{}'.format(q)) for q in range(seq_len)]
+                                          name='Encoder_Input_{}'.format(q)) for q in range(self.seq_len)]
         self.dec_inputs = []
-
         self.enc_cells = []
         self.dec_cells = []
-
         self.enc_scopes = []
         self.dec_scopes = []
         self.dec_data = []
 
-        for i in range(self.n_layers):
-            enc_cell = BasicLSTMCell(((2 * self.cells_size) ** i) * self.emb_size)
-            if self.cells_size > 1:
-                cell = MultiRNNCell([enc_cell] * self.cells_size)
-                self.enc_cells.append(cell)
-            else:
-                self.enc_cells.append(enc_cell)
+        self.cell_type = cell_type
 
+        # topology = [..., (layer_size, state_dim), ...]
+
+        def build_layer(layer_size, input_size):
+            enc_cell = self.cell_type(input_size)
+            if layer_size > 1:
+                enc_cell = [enc_cell]
+                for _ in range(1, layer_size):
+                    enc_cell.append(self.cell_type(input_size, enc_cell[-1].output_size))
+                enc_cell = MultiRNNCell(enc_cell)
+            return enc_cell
+
+        def build_inputs(seq_len, input_size):
+            return [tf.placeholder(tf.float32, [self.batch_size, input_size]) for _ in range(seq_len)]
+
+        for i in range(0, self.n_layers):
+            size = self.enc_cells[i - 1].state_size if i > 0 else self.emb_size
+            cell = build_layer(self.cell_sizes[i], size)
+            self.enc_cells.append(cell)
             self.enc_scopes.append('encoder_{}'.format(i))
-
-            dec_cell = BasicLSTMCell(((2 * self.cells_size) ** i) * self.emb_size)
-            if self.cells_size > 1:
-                cell = MultiRNNCell([dec_cell] * self.cells_size)
-                self.dec_cells.append(cell)
-            else:
-                self.dec_cells.append(dec_cell)
-
-            j = self.n_layers - i - 1
-
-            dec_inp = [tf.placeholder(tf.float32, [batch_size, (2 ** j) * self.cells_size * self.emb_size])
-                       for _ in range(self.topology[j])]
-            dec_data = [np.zeros((batch_size, (2 ** j) * self.cells_size * self.emb_size))
-                        for _ in range(self.topology[j])]
-            self.dec_inputs.append(dec_inp)
-            self.dec_data.append(dec_data)
+            dec_input = build_inputs(self.seq_sizes[i], size)
+            self.dec_cells.append(cell)
+            self.dec_inputs.append(dec_input)
+            self.dec_data.append([np.zeros((batch_size, self.dec_cells[i].input_size))
+                                  for _ in range(self.seq_sizes[i])])
             self.dec_scopes.append('decoder_{}'.format(i))
 
         self.dec_inputs = self.dec_inputs[::-1]
@@ -68,10 +67,11 @@ class HierarchicalSeq2SeqModel:
         if embed:
             self.enc_cells[0] = EmbeddingWrapper(self.enc_cells[0], self.emb_size, self.emb_size)
             self.enc_inputs = [tf.placeholder(tf.int32, [None],
-                                              name='Encoder_Input_{}'.format(q)) for q in range(seq_len)]
+                                              name='Encoder_Input_{}'.format(q)) for q in range(self.seq_len)]
             self.targets = [tf.placeholder(tf.int32, [None],
-                                           name='Target_{}'.format(q)) for q in range(seq_len)]
-            self.weights = [tf.placeholder(tf.float32, [None], name='Weights_{}'.format(q)) for q in range(seq_len)]
+                                           name='Target_{}'.format(q)) for q in range(self.seq_len)]
+            self.weights = [tf.placeholder(tf.float32, [None],
+                                           name='Weights_{}'.format(q)) for q in range(self.seq_len)]
 
         self.encoder = self.hierarchical_encoder()
         self.logits = self.hierarchical_decoder(self.encoder)
@@ -105,9 +105,10 @@ class HierarchicalSeq2SeqModel:
         with variable_scope.variable_scope('encoder'):
             states = self.enc_inputs
             for i in range(self.n_layers):
+                n_steps = self.seq_sizes[i]
                 states = self.encoder(self.enc_cells[i],
                                       states,
-                                      self.topology[i],
+                                      n_steps,
                                       self.batch_size,
                                       tf.float32,
                                       self.enc_scopes[i])
@@ -174,23 +175,21 @@ class HierarchicalSeq2SeqModel:
         else:
             return results
 
-    def get_batch(self, data, size=None):
-        if not size:
-            size = self.batch_size
+    def get_batch(self, data, batch_size=None):
+        if not batch_size:
+            batch_size = self.batch_size
 
         seq_size = len(self.enc_inputs)
-        ind = rnd.randint(0, len(data[0]), size).tolist()
+        ind = rnd.randint(0, len(data[0]), batch_size).tolist()
         input_sample = [data[0][i] for i in ind]
         output_sample = [data[1][i] for i in ind]
         inputs = [[] for _ in range(seq_size)]
         targets = [[] for _ in range(seq_size)]
 
         for i in range(seq_size):
-            for j in range(size):
+            for j in range(batch_size):
                 inputs[i].append(input_sample[j][i])
                 targets[i].append(output_sample[j][i])
 
-        inputs = list(map(lambda x: np.asarray(x, dtype='int32'), inputs))
-        targets = list(map(lambda x: np.asarray(x, dtype='int32'), targets))
         weights = [np.sign(x).astype(float) for x in targets]
         return inputs, targets, weights, ind
