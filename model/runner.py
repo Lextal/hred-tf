@@ -29,14 +29,11 @@ tf.app.flags.DEFINE_string('train_dir', train_dir, "Model directory")
 tf.app.flags.DEFINE_string("log_file", train_dir + 'training.log', "Logging the perplexity")
 tf.app.flags.DEFINE_integer('vocab_size', len(DEFAULT_VOCAB), "The size of vocabulary")
 tf.app.flags.DEFINE_integer('batch_size', 50, "The size of batch for every step")
-tf.app.flags.DEFINE_integer("num_layers", 4, "Number of LSTM cells in each layer")
 tf.app.flags.DEFINE_float("learning_rate", 0.8, "Learning rate.")
 tf.app.flags.DEFINE_float("learning_rate_decay_factor", 0.99, "Learning rate decays by this much.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
 tf.app.flags.DEFINE_integer("steps_per_checkpoint", 10,
                             "How many training steps to do per checkpoint.")
-tf.app.flags.DEFINE_integer("seq_len", seq_len, "Fixed length of input and output sequence")
-
 FLAGS = tf.app.flags.FLAGS
 
 
@@ -113,7 +110,7 @@ def train(source_path, target_path, verbose=False):
                 if verbose:
                     orig = decode(targets)
                     outs = decode(outputs)
-                    for i in range(5):
+                    for i in range(10):
                         print(orig[i], ' || ', outs[i])
 
 
