@@ -1,10 +1,12 @@
 import re
+
 import numpy as np
 import tensorflow as tf
 
 
 def prepare_splitters(tokens):
     return [re.compile(t) for t in tokens]
+
 
 DEFAULT_VOCAB_KEYS = [''] + [chr(ord('a') + i) for i in range(26)] + [str(i) for i in range(10)] + [' ']
 DEFAULT_VOCAB = dict(zip(DEFAULT_VOCAB_KEYS, range(len(DEFAULT_VOCAB_KEYS))))
@@ -93,10 +95,10 @@ def validate(path, levels):
     return True
 
 
-def split_source_and_target(seq_file, data_dir):
-    data = open(seq_file).readlines()
-    source = open(data_dir + 'source.txt', 'w')
-    target = open(data_dir + 'target.txt', 'w')
-    for i in range(len(data) - 1):
-        source.write(data[i])
-        target.write(data[i + 1])
+def split_source_and_target(seq_file_path, data_dir_path):
+    with open(data_dir_path + '/source.txt', 'w') as source, open(data_dir_path + '/target.txt', 'w') as target:
+        with open(seq_file_path) as seq_file:
+            data = seq_file.readlines()
+            for i in range(len(data) - 1):
+                source.write(data[i])
+                target.write(data[i + 1])
